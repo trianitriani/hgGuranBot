@@ -61,7 +61,7 @@ def master(_, message):
     if  autenticazioneMaster(message.from_user.username):
         #accesso permesso al master
         listaComandiMaster(message)
-
+        
         # --------- GESTIONE DELLE STATISTICHE DEL GIOCATORE
         # Settare i dati di un giocatore dello diverso girone del master tutti assieme
         # /set [player] [life] [forza] [agilita] [astuzia] [classe] [girone]
@@ -96,10 +96,10 @@ def master(_, message):
         # mostra una lista completa di tutte le missioni esistenti per tutti i gironi
         # /listaMissioni
         @app.on_message(filters.command(["listaMissioni"]))
-        def listaMissioniMaster(_, message):
+        def listaMissioni(_, message):
             if autenticazioneMaster(message.from_user.username):
                 listaMissioniMaster(message)
-
+        
         # modificare stati della missione
         # /missione [idMissione] [attiva/conclusa/disattiva | otp]
         @app.on_message(filters.command(["missione"]))
@@ -149,7 +149,7 @@ def master(_, message):
                 listaAttive(message)
 
         # funzione per aggiungere/rimuovere attiva 
-        # /attiva aggiungi [giocatore] [nome] [cd]
+        # /attiva aggiungi [giocatore] [cd] [nome]
         # /attiva rimuovi [id]
         @app.on_message(filters.command(["attiva"]))
         def settaAttiva(_, message):

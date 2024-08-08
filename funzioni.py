@@ -2,9 +2,10 @@
 # Author:       Lorenzo Valtriani
 # Data:         6/02/2021 V 1.0
 #               6/08/2024 V 2.0
+#               7/08/2024 V 2.1 
 #
 # Descrizione:  Funzione usati per il file HgGuran_bot.py
-# Versione:     2.0
+# Versione:     2.1
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 from pyrogram import Client, filters
 import sqlite3
@@ -12,6 +13,10 @@ import math
 
 nomi_giocatori = []
 classi = ["riftwalker", "alchimista", "dragomante", "mannaro", "appestatore", "cartomante", "samurai", "ranger", "minatore", "barbaro", "valchiria", "guerriero", "predatore", "arciere", "cacciatore", "druido", "mago", "monaco", "paladino", "spia", "bardo", "pirata", "giullare", "piromane", "re", "ninja", "cavaliere", "sciamano"]
+masters = []
+tag_to_name = {
+    
+}
 
 def calcolaBonus(stat):
     if (stat == 1 or stat == 2):
@@ -72,7 +77,7 @@ def listaClassi():
     return testo
 
 def getNomeGiocatoreByTag(tag):
-    return None
+    return tag_to_name.get(tag, None)
 
 def getGironeByGiocatore(giocatore):
     #creazione della connessione al db
@@ -85,7 +90,7 @@ def getGironeByGiocatore(giocatore):
     # se non c'è il giocatore cercato allora può accedere ai comandi perchè non sta giocando agli hg come giocatore
     if len(row) == 0:
         return False
-    return row[0]["FK_Girone"]
+    return row[0][0]
 
 # FUNZIONE PER CONVERTIRE IN FILE BINARIO FILE DI GRANDI DIMENSIONI
 def convertToBinaryData(path):
@@ -182,7 +187,7 @@ def pdfClassi(app, message):
     # 3: la miniatura
     # 4: la didascalia
     app.send_document(message.from_user.username, "archivio/classi.pdf", "archivio/guran.jpg", "le classi.");
-
+    
 def pdfBoss(app, message):
     app.send_document(message.from_user.username, "archivio/boss.pdf", "archivio/boss.png", "i boss.");
 
@@ -196,8 +201,8 @@ def echoInfo(message, giocatore):
     #creazione del cursore
     c = conn.cursor()
 
-    girone = getGironeByGiocatore(message.command[1])
-    if(gironeDiverso(message.from_user.username, girone) == False):
+    girone = getGironeByGiocatore(giocatore)
+    if(gironeDiverso(message.from_user.username, girone) == False and giocatore != getNomeGiocatoreByTag(message.from_user.username)):
         message.reply_text("Non puoi visualizzare roba nel tuo stesso girone...")
         return
     
@@ -217,8 +222,8 @@ def echoInfo(message, giocatore):
     if (vita == None or forza == None or agilita == None or astuzia == None):
         message.reply_text("Il giocatore non è ancora stato settato!")
         return
-
-    testo = "🧑‍🦱--Info Giocatore--\n\n"
+    
+    testo = "🧑‍🦱--Info Giocatore-- [G"+str(girone)+"]\n\n"
     testo += "\t\tNome: "+giocatore.upper()+"__\t\t\t\t\t("+classe.title()+")__\n"
     if vita >= 20:
         testo += "\t\t💚"
@@ -244,8 +249,8 @@ def echoInfo(message, giocatore):
     nobj = 0
     for row in rows:
         nobj += row[2]
-
-    testo += "\n🎒-- Inventario:  ("+str(nobj)+"/"+str(10 + calcolaBonus(forza))+") --\n"
+    
+    testo += "\n🎒-- Inventario: -- ("+str(nobj)+"/"+str(10 + calcolaBonus(forza))+") \n"
     if len(rows) == 0:
         testo += "\t\tvuoto"
     else:
@@ -286,11 +291,19 @@ def listaComandiMaster(message):
     stringa += "/missione **[idMissione] [attiva/conclusa/disattiva | otp]** \n__disattiva, concludi o attiva la missione rispetto al suo ID. Il secondo argomento si può omettere e la missione si concluderà__\n"
     stringa += "/levaOggetto **[player] [obj]**\n__modifica gli oggetti che ha il giocatore selezionato__\n"
     stringa += "/mettiOggetto **[player] [obj] [info|opt]**\n__aggiunge un oggetto, le info comprendono il danno, non sono obbligatorie__\n"
+    stringa += "/listaAttive **[girone]**\n__mostra la lista di tutte le attive/abilità in ricarica dei giocatori di quel girone__\n"
+    stringa += "/attiva **aggiungi [giocatore] [cd] [nome_attiva]**\n__aggiungi un'attiva del giocatore in ricarica__\n"
+    stringa += "/attiva **rimuovi [id_attiva]**\n__rimuovi l'attiva selezionandola con il suo id, controllalo dalla lista delle attive__\n"
+    stringa += "/modCd **[id_attiva] [nuovo_cd]**\n__modifica il cd relativo ad un'attiva__\n"
+    stringa += "/decrementaAttive **[girone] [id_attiva/opt]**\n__decrementa il cd di un'attiva del girone selezionato con il suo id, se viene omesso allora decrementa tutte le attive del girone__\n"
     message.reply_text(stringa)
 
 # lista di tutti i master
 def autenticazioneMaster(username):
-    return False
+    if username in masters:
+        return True
+    else:
+        return False
 
 # gestisci l'eliminazione di un oggetto dall'inventario di un giocatore (con controllo su girone != master)
 def riduciInventario(message, app):
@@ -501,12 +514,12 @@ def listaMissioniMaster(message):
     stringa = ""
     #mostrare la lista delle missioni che sono state inserite nel database (anche quelle non giocabili)
     for row in rows:
-         stringa += row[0]+") "+row[1]+" [G"+row[3]+"] "
+         stringa += str(row[0])+") "+row[1]+" [G"+str(row[3])+"] "
          if(row[2] == True): 
             stringa += "✅\n"
          else: 
             stringa += "\n"
-        
+    
     c.close()
     conn.close()
     message.reply_text(stringa)
@@ -534,6 +547,7 @@ def modMissione(message):
             else:
                 message.reply_text("Secondo comando non riconosciuto..")
                 return
+            
             query = "UPDATE missione SET finita = ?, attiva = ? WHERE ID_Missione = ?"
             c.execute(query, [finita, attiva, mission])
             conn.commit()
@@ -542,15 +556,13 @@ def modMissione(message):
             row = c.fetchall()
             if finita == 1:
                 message.reply_text("Hai concluso la missione: **"+row[0][0]+"**\n")
-            else:
-                message.reply_text("Hai attivato la missione: **"+row[0][0]+"**\n")
-
-            if attiva == 1:
+            elif attiva == 1:
                 message.reply_text("Hai aggiunto la missione: **"+row[0][0]+"**\n")
             else:
                 message.reply_text("Hai disattivato la missione: **"+row[0][0]+"**\n")
             c.close()
             conn.close()
+
         # se non è stato inserito il parametro "attiva" "disattiva" "conclusa" si presuppone di concluderla
         except IndexError:
             query = "UPDATE missione SET finita = 1 WHERE ID_Missione = ?"
@@ -559,14 +571,16 @@ def modMissione(message):
             query = "SELECT nome FROM missione WHERE ID_Missione = ?"
             c.execute(query, [mission])
             row = c.fetchall()
-            message.reply_text("Hai concluso la missione: \n**"+row[0][0]+"**")
+            message.reply_text("Hai concluso la missione: **"+row[0][0]+"**")
             c.close()
             conn.close()
+
     except IndexError:
         message.reply_text("Non hai specificato il numero della missione, oppure non è valida!")
         c.close()
         conn.close()
         return
+    
     except ValueError:
         message.reply_text("I dati sono sbagliati...")
 
@@ -673,84 +687,138 @@ def getGironeByAttiva(id_attiva):
                 FROM attiva A, giocatore G
                 WHERE A.FK_Giocatore = G.ID_Giocatore AND A.ID_Attiva = ?"""
     c.execute(query, [id_attiva])
-    girone_target = c.fetchone()[0]
+    row = c.fetchone()
+    if row == None:
+        return False
+    
+    girone_target = row[0]
     c.close()
     conn.close()
-
     return girone_target
 
 # ottieni la lista delle attive in cd nel proprio girone (con controllo girone != girone master)
 def listaAttive(message):
-    girone = getGironeByGiocatore(message.from_user.username)
-    girone_target = message.command[1]
-    if(girone == girone_target):
-        message.reply_text("Mica puoi controllare le informazioni del tuo girone")
-        return
-
-    #creazione della connessione al db
-    conn = sqlite3.connect('hg.db')
-    #creazione del cursore
-    c = conn.cursor()
-    query = """SELECT A.ID_Attiva, A.nome, A.cd, G.nome
-               FROM attiva A, giocatore G 
-               WHERE A.FK_Giocatore = G.ID_Giocatore AND G.FK_Girone = ?"""
-    c.execute(query, [girone_target])
-    rows = c.fetchall()
-    if len(rows) == 0:
-            message.reply_text("Non ci sono ancora attive attivate!")
+    girone = getGironeByGiocatore(getNomeGiocatoreByTag(message.from_user.username))
+    try:
+        girone_target = int(message.command[1])
+        if girone == girone_target:
+            message.reply_text("Mica puoi controllare le informazioni del tuo girone")
             return
+        
+        #creazione della connessione al db
+        conn = sqlite3.connect('hg.db')
+        #creazione del cursore
+        c = conn.cursor()
+        query = """
+                SELECT A.ID_Attiva, A.nome, A.cd, G.nome
+                FROM attiva A, giocatore G 
+                WHERE A.FK_Giocatore = G.ID_Giocatore AND G.FK_Girone = ?"""
+        c.execute(query, [girone_target])
+        rows = c.fetchall()
+        if len(rows) == 0:
+                message.reply_text("Non ci sono ancora attive attivate!")
+                return
 
-    stringa = ""
-    #mostrare la lista delle attive usate
-    for row in rows:
-         stringa += row[0] + ") "+row[1]+" ["+row[3]+"] CD: **"+row[2]+"**\n"
-    c.close()
-    conn.close()
-    message.reply_text(stringa)
-    return
+        stringa = ""
+        #mostrare la lista delle attive usate
+        for row in rows:
+            stringa += str(row[0]) + ") "+row[1]+" ["+row[3]+"] CD: **"+str(row[2])+"**\n"
+        c.close()
+        conn.close()
+        message.reply_text(stringa)
+        return
+    
+    except IndexError:
+        message.reply_text("Non hai specificato il numero del girone!")
+        return
+    except ValueError:
+        message.reply_text("Non hai specificato il numero del girone!")
+        return
 
 # aggiungi o rimuovi un attiva dalla lista di un girone in cui non giochi (con controllo girone != master)
 # /attiva aggiungi [giocatore] [cd] [nome]
 # /attiva rimuovi [id]
 def settaRimuoviAttiva(message):
-    what = message.command[1]
-    if what == "aggiungi":
-        # controllo che il master non stia aggiungendo attive per giocatori del proprio girone da giocatore
-        girone = getGironeByGiocatore(message.from_user.username)
-        giocatore = message.command[2]
-        girone_target = getGironeByGiocatore(giocatore)
-        if(girone == girone_target):
-            message.reply_text("Mica puoi modificare le informazioni del tuo girone")
-            return 
-        
-        # ottentimento del cd
-        cd = message.command[3]
-        if(cd > 0):
-            message.reply_text("Il cd deve essere maggiore di zero.")
-            return
-        
-        # ottenimento del nome dell'attiva
-        nome = " ".join(message.command[4:])
+    try:
+        what = message.command[1]
+        if what == "aggiungi":
+            # controllo che il master non stia aggiungendo attive per giocatori del proprio girone da giocatore
+            girone = getGironeByGiocatore(getNomeGiocatoreByTag(message.from_user.username))
+            giocatore = message.command[2]
+            girone_target = getGironeByGiocatore(giocatore)
+            if(girone == girone_target):
+                message.reply_text("Mica puoi modificare le informazioni del tuo girone")
+                return 
+            
+            # ottentimento del cd
+            cd = message.command[3]
+            if(int(cd) <= 0):
+                message.reply_text("Il cd deve essere maggiore di zero.")
+                return
+            
+            # ottenimento del nome dell'attiva
+            nome = " ".join(message.command[4:])
 
-        #creazione della connessione al db
-        conn = sqlite3.connect('hg.db')
-        #creazione del cursore
-        c = conn.cursor()
+            #creazione della connessione al db
+            conn = sqlite3.connect('hg.db')
+            #creazione del cursore
+            c = conn.cursor()
 
-        # ottenimento dell'id del giocatore
-        c.execute("SELECT ID_Giocatore FROM giocatore WHERE nome = ?", (giocatore))
-        id_giocatore = c.fetchone()
+            # ottenimento dell'id del giocatore
+            c.execute("SELECT ID_Giocatore FROM giocatore WHERE nome = ?", [giocatore])
+            id_giocatore = c.fetchone()
 
-        # inserimento attiva
-        query = "INSERT INTO attiva(nome, cd, FK_Giocatore) VALUES (?,?,?)"
-        c.execute(query, [nome, cd, id_giocatore[0]])
-        conn.commit()
-        c.close()
-        conn.close()
+            # inserimento attiva
+            query = "INSERT INTO attiva(nome, cd, FK_Giocatore) VALUES (?,?,?)"
+            c.execute(query, [nome, cd, id_giocatore[0]])
+            conn.commit()
+            c.close()
+            conn.close()
+            message.reply_text("Hai aggiunto l'attiva "+nome+" di "+giocatore)
 
-    elif what == "rimuovi":
-        girone = getGironeByGiocatore(message.from_user.username)
-        id_attiva = message.command[2]
+        elif what == "rimuovi":
+            girone = getGironeByGiocatore(getNomeGiocatoreByTag(message.from_user.username))
+            id_attiva = message.command[2]
+            
+            #creazione della connessione al db
+            conn = sqlite3.connect('hg.db')
+            #creazione del cursore
+            c = conn.cursor()
+
+            # controllare che il girone sia diverso da quello del master giocatore
+            girone_target = getGironeByAttiva(id_attiva)
+            if(girone == girone_target):
+                message.reply_text("Mica puoi modificare le informazioni del tuo girone")
+                c.close()
+                conn.close()
+                return
+
+            # rimuovere l'attiva dal database
+            query = """DELETE FROM attiva 
+                    WHERE ID_Attiva = ?"""
+            c.execute(query, [id_attiva])
+            conn.commit()
+            c.close()
+            conn.close()
+            message.reply_text("Hai rimosso l'attiva di id "+str(id_attiva))
+
+        else:
+            message.reply_text("Parametro numero 1 non valido, controlla la sintassi con /master")
+
+    except IndexError:
+        message.reply_text("Controlla la sintassi con /master")
+    except ValueError:
+        message.reply_text("Controlla la sintassi con /master")
+
+    return
+
+# funzione per modificare i cd dell'attiva (con controllo girone != master)
+# /modCd [id_attiva] [cd]
+def modificaCd(message):
+    try:
+        girone = getGironeByGiocatore(getNomeGiocatoreByTag(message.from_user.username))
+        id_attiva = message.command[1]
+        cd = message.command[2]
 
         #creazione della connessione al db
         conn = sqlite3.connect('hg.db')
@@ -764,102 +832,92 @@ def settaRimuoviAttiva(message):
             c.close()
             conn.close()
             return
-
-        # rimuovere l'attiva dal database
-        query = """DELETE FROM attiva 
-                   WHERE ID_Attiva = ?"""
-        c.execute(query, [id_attiva])
+        
+        # modificare valore del cd
+        query = """UPDATE attiva 
+                SET cd = ? 
+                WHERE ID_Attiva = ?"""
+        c.execute(query, [cd, id_attiva])
         conn.commit()
         c.close()
         conn.close()
+        message.reply_text("Valore del cd modificato, controlla il risultato con /listaAttive")
+        return
 
-    else:
-        message.reply_text("Parametro numero 1 non valido, controlla la sintassi con /master")
-    
+    except IndexError:
+        message.reply_text("Controlla la sintassi con /master")
+    except ValueError:
+        message.reply_text("Controlla la sintassi con /master")
+
     return
 
-# funzione per modificare i cd dell'attiva (con controllo girone != master)
-# /modCd [id_attiva] [cd]
-def modificaCd(message):
-    girone = getGironeByGiocatore(message.from_user.username)
-    id_attiva = message.command[1]
-
+# decrementa il cd di una attiva data come ingresso
+def decrementaCdMethod(id_attiva):
     #creazione della connessione al db
     conn = sqlite3.connect('hg.db')
     #creazione del cursore
     c = conn.cursor()
-
-    # controllare che il girone sia diverso da quello del master giocatore
-    girone_target = getGironeByAttiva(id_attiva)
-    if(girone == girone_target):
-        message.reply_text("Mica puoi modificare le informazioni del tuo girone")
-        c.close()
-        conn.close()
-        return
-    
-    # modificare valore del cd
+    # allora decremento solo l'attiva target
     query = """UPDATE attiva 
-               SET cd = ? 
+               SET cd = cd - 1
                WHERE ID_Attiva = ?"""
     c.execute(query, [id_attiva])
     conn.commit()
     c.close()
     conn.close()
-    message.reply_text("Valore del cd modificato, controlla il risultato con /listaAttive")
     return
 
 # decrementa cd di un attiva o di tutte, se il master non inserisce un parametro (con controllo girone != master)
 # /decrementaAttive [id_girone] [id/opt]
 def decrementaCd(message):
-    # controllare che il girone non sia quello del master giocatore
-    girone = getGironeByGiocatore(message.from_user.username)
-    girone_target = message.command[1]
-    if(girone == girone_target):
-        message.reply_text("Mica puoi modificare le informazioni del tuo girone")
-        return
-    
-    id_attiva = message.command[2]
-    if id_attiva == "":
-        # allora decremento tutte le attive del girone
-        # creazione della connessione al db
-        conn = sqlite3.connect('hg.db')
-        #creazione del cursore
-        c = conn.cursor()
-        # allora decremento solo l'attiva target
-        query = """UPDATE attiva 
-                   SET cd = cd - 1
-                   WHERE ID_Attiva IN (
-                                        SELECT A.ID_Attiva
-                                        FROM attiva A, giocatore G
-                                        WHERE A.FK_Giocatore = G.ID_Giocatore 
-                                              AND G.FK_Girone = ?
-                                      )"""
-        c.execute(query, [girone])
-        conn.commit()
-        c.close()
-        conn.close()
-        message.reply_text("Valori dei cd decrementati, controlla i risultati con /listaAttive")
-
-    else:
-        # controllo extra poichè il master può aver inserito un id_girone != da quello 
-        # effettivamente relativo all'attiva
-        girone_target = getGironeByAttiva(id_attiva)
+    try:
+        # controllare che il girone non sia quello del master giocatore
+        girone = getGironeByGiocatore(getNomeGiocatoreByTag(message.from_user.username))
+        girone_target = message.command[1]
         if(girone == girone_target):
             message.reply_text("Mica puoi modificare le informazioni del tuo girone")
             return
+        
+        try:
+            id_attiva = message.command[2]
+            # controllo extra poichè il master può aver inserito un id_girone != da quello 
+            # effettivamente relativo all'attiva
+            girone_target = getGironeByAttiva(id_attiva)
+            if(girone == girone_target):
+                message.reply_text("Mica puoi modificare le informazioni del tuo girone")
+                return
+            
+            decrementaCdMethod(id_attiva)
+            message.reply_text("Valore del cd decrementato, controlla il risultato con /listaAttive")
+            return
+        
+        except IndexError:
+            # allora decremento tutte le attive del girone
+            # creazione della connessione al db
+            conn = sqlite3.connect('hg.db')
+            #creazione del cursore
+            c = conn.cursor()
+            # allora decremento solo l'attiva target
+            query = """SELECT A.ID_Attiva
+                       FROM attiva A, giocatore G
+                       WHERE A.FK_Giocatore = G.ID_Giocatore AND G.FK_Girone = ?"""
+            c.execute(query, [girone_target])
+            rows = c.fetchall()
+            if len(rows) == 0:
+                message.reply_text("Non ci sono ancora attive attivate nel girone "+girone_target+"!")
+                return
+            
+            for row in rows:
+                decrementaCdMethod(row[0])
+            
+            c.close()
+            conn.close()
+            message.reply_text("Valori dei cd decrementati, controlla i risultati con /listaAttive")
+            return
 
-        #creazione della connessione al db
-        conn = sqlite3.connect('hg.db')
-        #creazione del cursore
-        c = conn.cursor()
-        # allora decremento solo l'attiva target
-        query = """UPDATE attiva 
-                   SET cd = cd - 1
-                   WHERE ID_Attiva = ?"""
-        c.execute(query, [id_attiva, id_attiva])
-        conn.commit()
-        c.close()
-        conn.close()
-        message.reply_text("Valore del cd decrementato, controlla il risultato con /listaAttive")
+    except IndexError:
+        message.reply_text("Controlla la sintassi con /master")
+    except ValueError:
+        message.reply_text("Controlla la sintassi con /master")
 
     return

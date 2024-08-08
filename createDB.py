@@ -1,5 +1,4 @@
 import sqlite3
-
 #creazione della connessione al db
 conn = sqlite3.connect('hg.db')
 #creazione del cursore
@@ -23,7 +22,15 @@ nomi_giocatori = []
 
 #inserimento di tutti i giocatori della tabella
 for nome_giocatore in nomi_giocatori:
-    c.execute("INSERT INTO giocatore (nome) VALUES (?)", [nome_giocatore])
+    if nome_giocatore == "prova1":
+        girone = 1
+    elif nome_giocatore == "prova2":
+        girone = 2
+    elif nome_giocatore == "prova3":
+        girone = 3
+    else:
+        girone = 0
+    c.execute("INSERT INTO giocatore (nome, FK_Girone) VALUES (?, ?)", [nome_giocatore, girone])
 
 # ********************************** TABELLA BIOMA ***************************************
 c.execute('''CREATE TABLE bioma (
@@ -38,8 +45,8 @@ c.execute('''CREATE TABLE attiva (
                 ID_Attiva INTEGER PRIMARY KEY,
                 nome CHAR(100) NOT NULL,
                 cd INTEGER NOT NULL,
-                FK_Giocatore INTEGER NOT NULL
-                FOREIGN KEY(FK_Giocatore) REFERENCES giocatore(ID_Giocatore),
+                FK_Giocatore INTEGER NOT NULL,
+                FOREIGN KEY(FK_Giocatore) REFERENCES giocatore(ID_Giocatore)
                 ON DELETE CASCADE ON UPDATE CASCADE
             )''')
 
@@ -60,7 +67,7 @@ c.execute('''CREATE TABLE missione (
                 attiva INTEGER(1) DEFAULT(0),
                 FK_Girone INTEGER NOT NULL,
                 FK_Bioma INTEGER NOT NULL,
-                FOREIGN KEY(FK_Bioma) REFERENCES bioma(ID_Bioma),
+                FOREIGN KEY(FK_Bioma) REFERENCES bioma(ID_Bioma)
                 ON DELETE CASCADE ON UPDATE CASCADE
             )''')
 
@@ -265,8 +272,8 @@ missioni = [
 
 # Inserire tutte le missioni per tutti i gironi
 for missione in missioni:
-    for i in range(4):
-        c.execute("INSERT INTO missione (nome, descrizione, ricompensa, FK_Bioma, FK_Girone) VALUES (?,?,?,?)", [missione[0], missione[1], missione[2], missione[3], i])
+    for i in range(3):
+        c.execute("INSERT INTO missione (nome, descrizione, ricompensa, FK_Bioma, FK_Girone) VALUES (?,?,?,?,?)", [missione[0], missione[1], missione[2], missione[3], i+1])
 
 #TABELLA OGGETTO (COLLEGATO A GIOCATORE)
 c.execute('''CREATE TABLE oggetto (
