@@ -1,11 +1,11 @@
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # Author:       Lorenzo Valtriani
-# Data:         6/02/2021 V 1.0
-#               6/08/2024 V 2.0
-#               7/08/2024 V 2.1 
+# Data:         06/02/2021  V 1.0
+#               06/08/2024  V 2.0
+#               10/08/2024  V 2.2 
 #
 # Descrizione:  Funzione usati per il file HgGuran_bot.py
-# Versione:     2.1
+# Versione:     2.2
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 from pyrogram import Client, filters
 import sqlite3
@@ -295,7 +295,7 @@ def listaComandiMaster(message):
     stringa += "/attiva **aggiungi [giocatore] [cd] [nome_attiva]**\n__aggiungi un'attiva del giocatore in ricarica__\n"
     stringa += "/attiva **rimuovi [id_attiva]**\n__rimuovi l'attiva selezionandola con il suo id, controllalo dalla lista delle attive__\n"
     stringa += "/modCd **[id_attiva] [nuovo_cd]**\n__modifica il cd relativo ad un'attiva__\n"
-    stringa += "/decrementaAttive **[girone] [id_attiva/opt]**\n__decrementa il cd di un'attiva del girone selezionato con il suo id, se viene omesso allora decrementa tutte le attive del girone__\n"
+    stringa += "/decrementaAttive **[girone] [giocatore/opt] [id_attiva/opt]**\n__decrementa il cd di un'attiva del girone selezionato con il suo id, se viene omesso allora decrementa tutte le attive del girone__\n"
     message.reply_text(stringa)
 
 # lista di tutti i master
@@ -868,7 +868,7 @@ def decrementaCdMethod(id_attiva):
     return
 
 # decrementa cd di un attiva o di tutte, se il master non inserisce un parametro (con controllo girone != master)
-# /decrementaAttive [id_girone] [id/opt]
+# /decrementaAttive [id_girone] [giocatore/opt] [id_attiva/opt]
 def decrementaCd(message):
     try:
         # controllare che il girone non sia quello del master giocatore
@@ -879,18 +879,50 @@ def decrementaCd(message):
             return
         
         try:
-            id_attiva = message.command[2]
-            # controllo extra poichè il master può aver inserito un id_girone != da quello 
-            # effettivamente relativo all'attiva
-            girone_target = getGironeByAttiva(id_attiva)
-            if(girone == girone_target):
-                message.reply_text("Mica puoi modificare le informazioni del tuo girone")
+            # controllare che il giocatore sia nel girone che è stato detto
+            giocatore = message.command[2]
+            girone_giocatore = int(getGironeByGiocatore(giocatore))
+            if(girone_giocatore != int(girone_target)):
+                message.reply_text("Il giocatore non fa parte del girone che è stato scelto prima!")
                 return
             
-            decrementaCdMethod(id_attiva)
-            message.reply_text("Valore del cd decrementato, controlla il risultato con /listaAttive")
-            return
-        
+            try:
+                id_attiva = message.command[3]
+                # controllo extra poichè il master può aver inserito un id_girone != da quello 
+                # effettivamente relativo all'attiva
+                girone_attiva = int(getGironeByAttiva(id_attiva))
+                if(int(girone_target) != girone_attiva or girone_giocatore != girone_attiva):
+                    message.reply_text("Il girone dell'attiva non combacia con il girone del giocatore o quello passato come parametro!")
+                    return
+                
+                decrementaCdMethod(id_attiva)
+                message.reply_text("Valore del cd dell'attiva decrementato, controlla il risultato con /listaAttive")
+                return
+            
+            except IndexError:
+                # allora decremento tutte le attive del giocatore
+                # creazione della connessione al db
+                conn = sqlite3.connect('hg.db')
+                #creazione del cursore
+                c = conn.cursor()
+                # allora decremento solo l'attiva target
+                query = """SELECT A.ID_Attiva
+                        FROM attiva A, giocatore G
+                        WHERE A.FK_Giocatore = G.ID_Giocatore AND G.nome = ?"""
+                c.execute(query, [giocatore])
+                rows = c.fetchall()
+                if len(rows) == 0:
+                    message.reply_text("Non ci sono ancora attive attivate del giocatore "+giocatore+"!")
+                    return
+            
+                for row in rows:
+                    decrementaCdMethod(row[0])
+
+                c.close()
+                conn.close()
+                message.reply_text("Valori dei cd decrementati per "+giocatore+", controlla i risultati con /listaAttive")
+                return
+
         except IndexError:
             # allora decremento tutte le attive del girone
             # creazione della connessione al db
@@ -899,8 +931,8 @@ def decrementaCd(message):
             c = conn.cursor()
             # allora decremento solo l'attiva target
             query = """SELECT A.ID_Attiva
-                       FROM attiva A, giocatore G
-                       WHERE A.FK_Giocatore = G.ID_Giocatore AND G.FK_Girone = ?"""
+                    FROM attiva A, giocatore G
+                    WHERE A.FK_Giocatore = G.ID_Giocatore AND G.FK_Girone = ?"""
             c.execute(query, [girone_target])
             rows = c.fetchall()
             if len(rows) == 0:
@@ -912,7 +944,7 @@ def decrementaCd(message):
             
             c.close()
             conn.close()
-            message.reply_text("Valori dei cd decrementati, controlla i risultati con /listaAttive")
+            message.reply_text("Valori dei cd decrementati per il girone "+girone_target+", controlla i risultati con /listaAttive")
             return
 
     except IndexError:

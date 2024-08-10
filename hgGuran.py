@@ -164,7 +164,7 @@ def master(_, message):
                 modificaCd(message)
 
         # decrementa cd di un attiva o di tutte, se il master non inserisce un parametro
-        # /decrementaAttive [id_girone] [id/opt]
+        # /decrementaAttive [id_girone] [giocatore/opt] [id_attiva/opt]
         @app.on_message(filters.command(["decrementaAttive"]))
         def decrementaAttive(_, message):
             if autenticazioneMaster(message.from_user.username):
